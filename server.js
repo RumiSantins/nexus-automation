@@ -65,7 +65,15 @@ app.post('/api/chat', async (req, res) => {
         if (jsonMatch) {
             try {
                 jsonOutput = JSON.parse(jsonMatch[0]);
-                cleanReply = reply.replace(jsonMatch[0], '').trim();
+                if (!jsonOutput.timestamp || jsonOutput.timestamp.includes('ISO_TIMESTAMP')) {
+                    jsonOutput.timestamp = new Date().toISOString();
+                }
+                // Strip JSON string and any markdown code block wrappers
+                cleanReply = reply
+                    .replace(/```json[\s\S]*?```/gi, '')
+                    .replace(/```[\s\S]*?```/gi, '')
+                    .replace(jsonMatch[0], '')
+                    .trim();
             } catch (e) {
                 console.error("Error parsing JSON from reply", e);
             }
