@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EgoS AI - Asistente Inmobiliario</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="chat-container">
+        <div class="chat-header">
+            <div class="avatar">
+                <img src="https://ui-avatars.com/api/?name=EgoS+AI&background=25D366&color=fff" alt="EgoS AI">
+            </div>
+            <div class="header-info">
+                <h2>EgoS AI</h2>
+                <p>Asistente Virtual - Zona Sur</p>
+            </div>
+        </div>
+        
+        <div class="chat-messages" id="chat-messages">
+            <div class="message assistant">
+                <p>¡Hola! Soy EgoS AI, asistente de la comercializadora de lotes. ¿En qué puedo ayudarte hoy?</p>
+                <div class="options">
+                    <button class="option-btn" onclick="sendOption('Ubicación y Precios de Lotes')">1. Ubicación y Precios de Lotes</button>
+                    <button class="option-btn" onclick="sendOption('Agendar Visita al Proyecto')">2. Agendar Visita al Proyecto</button>
+                    <button class="option-btn" onclick="sendOption('Hablar con una Asesora Comercial')">3. Hablar con una Asesora Comercial</button>
+                </div>
+            </div>
+        </div>
+
+        <div class="chat-input-area">
+            <input type="text" id="user-input" placeholder="Escribe un mensaje..." onkeypress="handleKeyPress(event)">
+            <button id="send-btn" onclick="sendMessage()">Enviar</button>
+        </div>
+    </div>
+
+    <!-- Panel for showing the extracted JSON to the developer -->
+    <div class="dev-panel">
+        <h3>Panel de Derivación (Backend)</h3>
+        <p>Aquí aparecerá el JSON generado si el Lead es CUALIFICADO.</p>
+        <pre id="json-output">Esperando datos...</pre>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
