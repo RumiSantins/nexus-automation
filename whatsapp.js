@@ -35,6 +35,7 @@ const messageTimeouts = {};
 
 // Opciones de Puppeteer con detección de Chromium para Termux / Android / Linux
 const puppeteerOptions = {
+    headless: true,
     args: [
         '--no-sandbox',
         '--disable-setuid-sandbox',
@@ -42,7 +43,9 @@ const puppeteerOptions = {
         '--disable-accelerated-2d-canvas',
         '--no-first-run',
         '--no-zygote',
+        '--single-process',
         '--disable-gpu',
+        '--disable-software-rasterizer',
         '--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36'
     ]
 };
