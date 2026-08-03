@@ -5,10 +5,16 @@ const jsonOutput = document.getElementById('json-output');
 // Generar un ID de sesión simple
 const sessionId = 'session_' + Math.random().toString(36).substr(2, 9);
 
-function appendMessage(text, sender) {
+function appendMessage(text, sender, imageUrl = null) {
     const messageDiv = document.createElement('div');
     messageDiv.classList.add('message', sender);
-    messageDiv.innerHTML = `<p>${text}</p>`;
+    
+    let html = `<p>${text}</p>`;
+    if (imageUrl) {
+        html += `<div class="message-image"><img src="${imageUrl}" alt="Imagen del proyecto" style="max-width:100%; border-radius:8px; margin-top:8px;"></div>`;
+    }
+    
+    messageDiv.innerHTML = html;
     chatMessages.appendChild(messageDiv);
     chatMessages.scrollTop = chatMessages.scrollHeight;
 }
@@ -60,13 +66,13 @@ async function sendMessage(text = null) {
         removeLoading();
 
         if (data.reply) {
-            appendMessage(data.reply, 'assistant');
+            appendMessage(data.reply, 'assistant', data.image);
         }
 
         if (data.data) {
             // Se recibió el JSON de calificación
             jsonOutput.innerText = JSON.stringify(data.data, null, 2);
-            jsonOutput.style.color = '#e6db74';
+            jsonOutput.style.color = '#50fa7b';
         }
 
     } catch (error) {

@@ -1,4 +1,4 @@
-const { Client, LocalAuth } = require('whatsapp-web.js');
+const { Client, LocalAuth, MessageMedia } = require('whatsapp-web.js');
 const qrcode = require('qrcode-terminal');
 const fs = require('fs');
 const path = require('path');
@@ -8,6 +8,18 @@ const { GoogleGenAI } = require('@google/genai');
 // Inicializar cliente de Gemini
 const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 const promptPath = path.join(__dirname, 'prompt_demo.md');
+
+// Catálogo de imágenes disponibles para envío automático por WhatsApp
+const AVAILABLE_IMAGES = {
+    'lotes_promo': path.join(__dirname, 'public', 'images', 'lotes_promo.jpg'),
+    'plano_lotes': path.join(__dirname, 'public', 'images', 'plano_lotes.jpg'),
+    'vista_panoramica': path.join(__dirname, 'public', 'images', 'vista_panoramica.jpg'),
+    'casa_campo': path.join(__dirname, 'public', 'images', 'casa_campo.jpg'),
+    'portico_ingreso': path.join(__dirname, 'public', 'images', 'portico_ingreso.jpg'),
+    'areas_verdes': path.join(__dirname, 'public', 'images', 'areas_verdes.jpg'),
+    'mapa_referencial': path.join(__dirname, 'public', 'images', 'mapa_referencial.jpg'),
+    'lotes_delimitados': path.join(__dirname, 'public', 'images', 'lotes_delimitados.jpg')
+};
 
 // Historial en memoria por número de teléfono
 const chatHistories = {};
@@ -34,7 +46,23 @@ client.on('qr', (qr) => {
 // Confirmación de conexión exitosa
 client.on('ready', () => {
     console.log('[INFO] ¡EgoS AI está conectado exitosamente a WhatsApp!');
-    console.log('[INFO] Esperando mensajes...');
+    console.log('[INFO] Esperando mensajes y eventos...');
+});
+
+// Escuchar cuando el usuario está escribiendo (composing) o grabando un audio (recording)
+client.on('chat_state', async (msg) => {
+    try {
+        const userNumber = msg.chatId;
+        if (closedChats[userNumber]) return;
+
+        if (msg.state === 'composing') {
+            console.log(`[ESTADO] El usuario ${userNumber} está escribiendo un mensaje...`);
+        } else if (msg.state === 'recording') {
+            console.log(`[ESTADO] El usuario ${userNumber} está grabando un audio...`);
+        }
+    } catch (e) {
+        // Evento ignorado si no tiene datos completos
+    }
 });
 
 // Escuchar mensajes entrantes
@@ -43,14 +71,47 @@ client.on('message', async (msg) => {
     if (msg.isGroupMsg || msg.isStatus) return;
 
     const userNumber = msg.from;
+    const bodyText = (msg.body || '').trim().toLowerCase();
 
-    // Si el lead ya fue derivado o rechazado, ignoramos para ahorrar tokens
-    if (closedChats[userNumber]) {
-        console.log(`[IGNORADO] Mensaje de ${userNumber} (Chat ya cerrado)`);
+    // Comando especial de demostración para reiniciar el chat en vivo sin reiniciar el servidor
+    if (['!reset', '!demo', '!reiniciar', '!limpiar'].includes(bodyText)) {
+        delete closedChats[userNumber];
+        delete chatHistories[userNumber];
+        delete pendingMessages[userNumber];
+        if (messageTimeouts[userNumber]) clearTimeout(messageTimeouts[userNumber]);
+        delete messageTimeouts[userNumber];
+        
+        console.log(`\n=============================================`);
+        console.log(`[DEMO RESET] Chat reiniciado para ${userNumber}`);
+        console.log(`=============================================\n`);
+        await msg.reply('El historial de demostracion ha sido reiniciado exitosamente. ¡Puedes comenzar una nueva prueba!');
         return;
     }
 
-    const userMessage = msg.body.trim();
+    // Si el lead ya fue derivado o rechazado, ignoramos para ahorrar tokens
+    if (closedChats[userNumber]) {
+        console.log(`[IGNORADO] Mensaje de ${userNumber} (Chat ya cerrado. Usa !reset para probar de nuevo)`);
+        return;
+    }
+
+    let userMessage = (msg.body || '').trim();
+
+    // Manejo de mensajes multimedia y tipos especiales (stickers, fotos, audios, documentos)
+    if (msg.type === 'sticker') {
+        userMessage = '[El usuario envió un sticker en WhatsApp]';
+    } else if (msg.type === 'image') {
+        const caption = (msg.caption || userMessage).trim();
+        userMessage = caption ? `[El usuario envió una imagen con el texto: "${caption}"]` : '[El usuario envió una imagen o foto]';
+    } else if (msg.type === 'ptt' || msg.type === 'audio') {
+        userMessage = '[El usuario envió un mensaje de voz o audio]';
+    } else if (msg.type === 'document') {
+        const caption = (msg.caption || userMessage).trim();
+        userMessage = caption ? `[El usuario envió un documento/PDF con el texto: "${caption}"]` : '[El usuario envió un documento/PDF]';
+    } else if (msg.type === 'location') {
+        userMessage = '[El usuario compartió su ubicación de WhatsApp]';
+    } else if (msg.hasMedia && !userMessage) {
+        userMessage = `[El usuario envió un archivo de tipo: ${msg.type}]`;
+    }
 
     if (!userMessage) return;
 
@@ -67,7 +128,7 @@ client.on('message', async (msg) => {
         clearTimeout(messageTimeouts[userNumber]);
     }
 
-    // Configurar temporizador de 4 segundos (4000ms)
+    // Configurar temporizador de 3 segundos (3000ms) tras el último mensaje/evento de escritura
     messageTimeouts[userNumber] = setTimeout(async () => {
         const fullMessage = pendingMessages[userNumber].text;
         const msgToReply = pendingMessages[userNumber].lastMsgObj;
@@ -79,13 +140,22 @@ client.on('message', async (msg) => {
         console.log(`\n[MENSAJE] Completo recibido de ${userNumber}: ${fullMessage}`);
 
         try {
-            // Intentar mostrar "escribiendo..."
+            // Intentar mostrar "escribiendo..." de forma asíncrona y con fallback para IDs @lid
             let chat = null;
             try {
                 chat = await msgToReply.getChat();
-                if (chat) chat.sendStateTyping();
+                if (chat && typeof chat.sendStateTyping === 'function') {
+                    await chat.sendStateTyping();
+                }
             } catch (e) {
-                console.log("No se pudo activar el estado 'escribiendo...', continuando...");
+                try {
+                    chat = await client.getChatById(userNumber);
+                    if (chat && typeof chat.sendStateTyping === 'function') {
+                        await chat.sendStateTyping();
+                    }
+                } catch (e2) {
+                    // Ignorado si el protocolo de WhatsApp no soporta presencia en este ID
+                }
             }
 
             // 1. Obtener la información de contacto real para resolver casos de IDs encriptados (@lid)
@@ -151,7 +221,7 @@ client.on('message', async (msg) => {
                     }
                     
                     // Cerrar el chat permanentemente para este número
-                    if (jsonOutput.lead_status === 'QUALIFIED' || jsonOutput.lead_status === 'REJECTED') {
+                    if (['QUALIFIED', 'REJECTED', 'DESECHADO'].includes(jsonOutput.lead_status)) {
                         closedChats[userNumber] = true;
                     }
                     
@@ -162,8 +232,11 @@ client.on('message', async (msg) => {
                         .trim();
                     
                     // Imprimir la ficha extraída en la consola
+                    const tag = jsonOutput.lead_status === 'QUALIFIED' ? '[LEAD CUALIFICADO]' : '[LEAD RECHAZADO/DESECHADO]';
                     console.log('\n=============================================');
-                    console.log('[LEAD CUALIFICADO] FICHA DEL CLIENTE:');
+                    console.log(`${tag} FICHA DEL CLIENTE:`);
+                    if (jsonOutput.user_profile) console.log(`Perfil detectado: ${jsonOutput.user_profile}`);
+                    if (jsonOutput.lead_priority) console.log(`Prioridad: ${jsonOutput.lead_priority}`);
                     console.log('=============================================');
                     console.log(JSON.stringify(jsonOutput, null, 2));
                     console.log('=============================================\n');
@@ -173,18 +246,44 @@ client.on('message', async (msg) => {
                 }
             }
 
-            // Quitar estado "escribiendo..." y enviar respuesta
+            // Detectar si la IA solicita enviar una imagen del catálogo
+            let imageToSend = null;
+            const imageMatch = cleanReply.match(/\[ENVIAR_IMAGEN:\s*([a-zA-Z0-9_-]+)\]/i);
+            if (imageMatch) {
+                const imageKey = imageMatch[1].toLowerCase();
+                if (AVAILABLE_IMAGES[imageKey] && fs.existsSync(AVAILABLE_IMAGES[imageKey])) {
+                    imageToSend = AVAILABLE_IMAGES[imageKey];
+                } else {
+                    // Imagen por defecto si no coincide la clave exacta
+                    imageToSend = AVAILABLE_IMAGES['lotes_promo'];
+                }
+                // Remover la etiqueta de la respuesta de texto enviada al usuario
+                cleanReply = cleanReply.replace(imageMatch[0], '').trim();
+            }
+
+            // Quitar estado "escribiendo..." y enviar respuesta de texto
             if (chat) chat.clearState();
             if (cleanReply) {
                 await msgToReply.reply(cleanReply);
                 console.log(`[RESPUESTA] Enviada a ${userNumber}`);
             }
 
+            // Enviar la imagen adjunta si fue solicitada por la IA
+            if (imageToSend) {
+                try {
+                    const media = MessageMedia.fromFilePath(imageToSend);
+                    await msgToReply.reply(media);
+                    console.log(`[IMAGEN ENVIADA] ${path.basename(imageToSend)} enviada a ${userNumber}`);
+                } catch (imgErr) {
+                    console.error("[ERROR] Al enviar la imagen por WhatsApp:", imgErr);
+                }
+            }
+
         } catch (error) {
             console.error('[ERROR] Al procesar con IA:', error);
             await msgToReply.reply('Lo siento, tuve un problema técnico procesando tu mensaje. ¿Podemos intentarlo de nuevo en un momento?');
         }
-    }, 4000); // 4000 milisegundos de espera
+    }, 3000); // 3000 milisegundos (3 segundos de espera tras dejar de escribir)
 });
 
 // Inicializar cliente
