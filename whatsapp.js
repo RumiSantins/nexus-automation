@@ -88,11 +88,29 @@ client.on('message', async (msg) => {
                 console.log("No se pudo activar el estado 'escribiendo...', continuando...");
             }
 
-            // Leer el prompt actualizado
+            // 1. Obtener la información de contacto real para resolver casos de IDs encriptados (@lid)
+            let realNumber = userNumber;
+            try {
+                const contact = await msgToReply.getContact();
+                if (contact && contact.number) realNumber = contact.number;
+            } catch (e) {
+                console.log("[ERROR] No se pudo obtener el contacto real");
+            }
+
+            // 2. Huevo de pascua: Saludo especial y EXCLUSIVO para el número 930 291 524
+            // Si es este número, mandamos el abrazo y cortamos la ejecución (no se llama a Gemini)
+            if (realNumber.includes('930291524') || userNumber.includes('930291524')) {
+                await msgToReply.reply("Hola! Primero que nada, EgoS te envía un gran abrazo");
+                if (chat) chat.clearState();
+                return; // ESTO EVITA QUE GEMINI RESPONDA ALGO MÁS
+            }
+
+            // 3. Leer el prompt actualizado
             const systemPrompt = fs.readFileSync(promptPath, 'utf8');
 
-            // Inicializar historial si es un usuario nuevo
+            // 4. Inicializar historial si es un usuario nuevo
             if (!chatHistories[userNumber]) {
+                console.log(`[INFO] Nuevo chat iniciado. ID: ${userNumber}, Real Number: ${realNumber}`);
                 chatHistories[userNumber] = [];
             }
 
