@@ -33,12 +33,37 @@ const closedChats = {}; // Para no responder más a leads ya cerrados
 const pendingMessages = {};
 const messageTimeouts = {};
 
-// Inicializar cliente de WhatsApp (guarda sesión localmente para no escanear el QR cada vez)
+// Opciones de Puppeteer con detección de Chromium para Termux / Android / Linux
+const puppeteerOptions = {
+    args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage', '--no-first-run']
+};
+
+const possibleChromiumPaths = [
+    process.env.CHROMIUM_PATH,
+    '/data/data/com.termux/files/usr/bin/chromium',
+    '/data/data/com.termux/files/usr/bin/chromium-browser',
+    '/usr/bin/chromium',
+    '/usr/bin/chromium-browser'
+].filter(Boolean);
+
+for (const chPath of possibleChromiumPaths) {
+    if (fs.existsSync(chPath)) {
+        puppeteerOptions.executablePath = chPath;
+        console.log(`[INFO] Usando Chromium desde: ${chPath}`);
+        break;
+    }
+}
+
+if (!puppeteerOptions.executablePath && (process.platform === 'android' || fs.existsSync('/data/data/com.termux'))) {
+    console.warn('\n[ADVERTENCIA] No se encontro Chromium instalado en Termux.');
+    console.warn('Para solucionarlo en tu tablet, ejecuta en Termux:');
+    console.warn('  pkg install x11-repo -y && pkg install chromium -y\n');
+}
+
+// Inicializar cliente de WhatsApp
 const client = new Client({
     authStrategy: new LocalAuth(),
-    puppeteer: {
-        args: ['--no-sandbox', '--disable-setuid-sandbox']
-    }
+    puppeteer: puppeteerOptions
 });
 
 // Generar código QR en consola

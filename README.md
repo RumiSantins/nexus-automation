@@ -44,6 +44,7 @@ EgoS AI es un asistente virtual conversacional impulsado por inteligencia artifi
 ## Documentación del Proyecto
 
 - [`guion_demostracion.md`](file:///c:/apps/DemoAutomatizacion/guion_demostracion.md): Guion de demostración paso a paso con 3 escenarios de prueba preparados para presentaciones ejecutivas.
+- [`ejecutar_en_tablet.md`](file:///c:/apps/DemoAutomatizacion/ejecutar_en_tablet.md): Guía práctica para probar o controlar el prototipo desde una tablet sin desplegar en la nube.
 - [`personalizacion_detallada.md`](file:///c:/apps/DemoAutomatizacion/personalizacion_detallada.md): Documentación completa sobre la matriz de conducta, esquema JSON y reglas de control.
 - [`funcionamiento_demo.md`](file:///c:/apps/DemoAutomatizacion/funcionamiento_demo.md): Explicación técnica de arquitectura, modelo de negocio, proyección de costos en producción y propuesta comercial.
 - [`presentacion_pitch.md`](file:///c:/apps/DemoAutomatizacion/presentacion_pitch.md): Guion y argumentos comerciales para presentaciones ante directivos.
