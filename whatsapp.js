@@ -21,6 +21,10 @@ const AVAILABLE_IMAGES = {
     'lotes_delimitados': path.join(__dirname, 'public', 'images', 'lotes_delimitados.jpg')
 };
 
+// Número corporativo destino para el reenvío automático de Fichas de Clientes (51919191089)
+const rawAdvisorPhone = process.env.ADVISOR_PHONE || '51919191089';
+const ADVISOR_TARGET_ID = rawAdvisorPhone.endsWith('@c.us') ? rawAdvisorPhone : `${rawAdvisorPhone.replace(/[^0-9]/g, '')}@c.us`;
+
 // Historial en memoria por número de teléfono
 const chatHistories = {};
 const closedChats = {}; // Para no responder más a leads ya cerrados
@@ -162,7 +166,20 @@ client.on('message', async (msg) => {
             let realNumber = userNumber;
             try {
                 const contact = await msgToReply.getContact();
-                if (contact && contact.number) realNumber = contact.number;
+                if (contact) {
+                    if (contact.number && !contact.number.startsWith('5311')) {
+                        realNumber = contact.number;
+                    } else if (contact.formattedNumber) {
+                        realNumber = contact.formattedNumber;
+                    }
+                }
+                if (realNumber.includes('5311') || realNumber.includes('@lid')) {
+                    if (msgToReply._data && msgToReply._data.author && msgToReply._data.author.includes('@c.us')) {
+                        realNumber = msgToReply._data.author.replace('@c.us', '');
+                    } else if (msgToReply._data && msgToReply._data.from && msgToReply._data.from.includes('@c.us')) {
+                        realNumber = msgToReply._data.from.replace('@c.us', '');
+                    }
+                }
             } catch (e) {
                 console.log("[ERROR] No se pudo obtener el contacto real");
             }
@@ -240,6 +257,37 @@ client.on('message', async (msg) => {
                     console.log('=============================================');
                     console.log(JSON.stringify(jsonOutput, null, 2));
                     console.log('=============================================\n');
+
+                    // Reenviar automáticamente la Ficha del Cliente al número corporativo (919 191 089)
+                    if (ADVISOR_TARGET_ID) {
+                        try {
+                            const isQualified = jsonOutput.lead_status === 'QUALIFIED';
+                            const titleTag = isQualified ? 'FICHA DE LEAD CUALIFICADO' : 'LEAD RECHAZADO / DESECHADO';
+                            
+                            const displayPhone = (jsonOutput.client_phone && jsonOutput.client_phone.length > 5) 
+                                ? jsonOutput.client_phone 
+                                : (realNumber.startsWith('5311') ? `+${realNumber} (Chat de WhatsApp directo)` : `+${realNumber}`);
+                            
+                            let summaryText = `[*${titleTag}*]\n\n`;
+                            summaryText += `*Cliente:* ${jsonOutput.client_name || 'No especificado'}\n`;
+                            summaryText += `*Telefono:* ${displayPhone}\n`;
+                            if (jsonOutput.user_profile) summaryText += `*Perfil:* ${jsonOutput.user_profile}\n`;
+                            if (jsonOutput.lead_priority) summaryText += `*Prioridad:* ${jsonOutput.lead_priority}\n`;
+                            if (jsonOutput.purpose) summaryText += `*Proposito:* ${jsonOutput.purpose}\n`;
+                            if (jsonOutput.timeframe) summaryText += `*Plazo:* ${jsonOutput.timeframe}\n`;
+                            if (jsonOutput.payment_method) summaryText += `*Modalidad:* ${jsonOutput.payment_method}\n`;
+                            if (jsonOutput.event_preference) summaryText += `*Cita Preferida:* ${jsonOutput.event_preference}\n`;
+                            if (jsonOutput.assigned_agent) summaryText += `*Asesora Asignada:* ${jsonOutput.assigned_agent}\n`;
+                            if (jsonOutput.observations) summaryText += `*Observaciones:* ${jsonOutput.observations}\n`;
+                            if (jsonOutput.reason) summaryText += `*Motivo Rechazo:* ${jsonOutput.reason}\n`;
+                            summaryText += `\n*Fecha/Hora:* ${jsonOutput.timestamp}`;
+
+                            await client.sendMessage(ADVISOR_TARGET_ID, summaryText);
+                            console.log(`[REENVÍO EXITOSO] Ficha reenviada a la asesora (${ADVISOR_TARGET_ID})`);
+                        } catch (fwdErr) {
+                            console.error(`[ERROR REENVÍO] No se pudo reenviar la ficha a ${ADVISOR_TARGET_ID}:`, fwdErr);
+                        }
+                    }
 
                 } catch (e) {
                     console.error("[ERROR] Parseando el JSON de Gemini:", e);

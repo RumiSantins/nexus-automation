@@ -83,6 +83,7 @@ Cuando la IA completa la cualificación (o detecta un rechazo/descarte), emite d
 
 ## 4. Reglas de Control y Guardrails del Sistema
 
+- **Prohibición Estricta de Relleno Conversacional y Halagos:** Se prohibió expresamente el uso de muletillas clásicas de chats de IA (ejemplo: "¡Es una estrategia excelente!", "¡Buena elección!", "Te explico:"). La IA actúa estrictamente como un canal ejecutivo de Atención al Cliente de WhatsApp Business, entregando el dato solicitado de forma directa en 1 o 2 líneas breves sin emitir felicitaciones ni opiniones personales.
 - **Estricto Uso de Texto Plano (Sin Emojis):** Respuestas profesionales exclusivamente en texto plano para garantizar compatibilidad formal.
 - **Regla Value First (Valor Primero):** Ante cualquier duda, la IA entrega primero un beneficio o dato de valor sobre la Zona Sur antes de realizar una nueva pregunta.
 - **Regla Anti-Interrogatorio:** Máximo una (1) pregunta por mensaje para evitar saturar al cliente.
@@ -98,7 +99,8 @@ Cuando la IA completa la cualificación (o detecta un rechazo/descarte), emite d
   7. `mapa_referencial`: Referencia de vías de acceso y mapa de ubicación.
   8. `lotes_delimitados`: Terrenos con demarcación de hitos y estacado.
   *Mecanismo:* Gemini incluye la etiqueta de control (ej. `[ENVIAR_IMAGEN: plano_lotes]`). El backend en Node.js detecta la etiqueta, remueve el código del texto visible para el usuario y envía la imagen adjunta mediante `MessageMedia` de WhatsApp. Si la imagen específica aún no está guardada en disco, el sistema aplica un fallback seguro a `lotes_promo` para garantizar que el cliente siempre reciba respuesta visual.
-- **Manejo de Contenido Multimedia (Stickers, Fotos, Audios, Documentos):** El backend intercepta los eventos de mensajes sin texto (ej. `msg.type === 'sticker'` o `msg.type === 'image'`) y genera descriptores contextuales (ej. `[El usuario envió un sticker en WhatsApp]`) para que la IA responda adecuadamente en lugar de ignorar la interacción.
+- **Reenvío Automático de Fichas al WhatsApp Comercial (919 191 089):** Cada vez que se califica o descarta un cliente, el backend compila la Ficha de Cliente y la envía automáticamente mediante un mensaje de WhatsApp formateado al número comercial `+51 919 191 089` (`51919191089@c.us`), permitiendo que el equipo de ventas reciba las notificaciones de leads en su propio chat al instante.
+- **Manejo de Estado (`closedChats`):** Una vez que un cliente es calificado o rechazado, el backend marca el número en memoria para dejar de procesar nuevos mensajes y ahorrar tokens de la API. `msg.type === 'sticker'` o `msg.type === 'image'`) y genera descriptores contextuales (ej. `[El usuario envió un sticker en WhatsApp]`) para que la IA responda adecuadamente en lugar de ignorar la interacción.
 - **Detección Bidireccional del Estado "Escribiendo...":**
   1. *Hacia el cliente:* El bot activa el estado "Escribiendo..." (`chat.sendStateTyping()`) en WhatsApp mientras Gemini genera la respuesta.
   2. *Desde el cliente:* El backend escucha el evento `chat_state` de WhatsApp Web. Detecta en tiempo real cuando el cliente está escribiendo (`composing`) o grabando un nota de voz (`recording`), permitiendo pausar temporizadores de respuesta para no interrumpir al usuario mientras redacta.
