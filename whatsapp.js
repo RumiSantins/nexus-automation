@@ -246,17 +246,32 @@ client.on('message', async (msg) => {
             
             contents.push({ role: 'user', parts: [{ text: fullMessage }] });
 
-            // Llamar a Gemini
-            const response = await ai.models.generateContent({
-                model: 'gemini-3.5-flash-lite',
-                contents: contents,
-                config: {
-                    systemInstruction: systemPrompt,
-                    temperature: 0.3,
-                }
-            });
+            // Función robusta para llamar a Gemini con reintentos y alternancia de modelos (evita errores 503 por alta demanda)
+            const reply = await (async function generateGeminiResponse() {
+                const modelsToTry = ['gemini-2.5-flash', 'gemini-3.5-flash-lite', 'gemini-2.0-flash'];
+                let lastError = null;
 
-            const reply = response.text;
+                for (const modelName of modelsToTry) {
+                    for (let attempt = 1; attempt <= 2; attempt++) {
+                        try {
+                            const res = await ai.models.generateContent({
+                                model: modelName,
+                                contents: contents,
+                                config: {
+                                    systemInstruction: systemPrompt,
+                                    temperature: 0.3,
+                                }
+                            });
+                            if (res && res.text) return res.text;
+                        } catch (err) {
+                            lastError = err;
+                            console.warn(`[REINTENTO] Modelo ${modelName} tuvo demanda alta (${err.status || 503}). Reintentando...`);
+                            await new Promise(r => setTimeout(r, 800));
+                        }
+                    }
+                }
+                throw lastError;
+            })();
 
             // Guardar en el historial
             chatHistories[userNumber].push({ role: 'user', text: fullMessage });

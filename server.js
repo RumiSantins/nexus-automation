@@ -71,16 +71,31 @@ app.post('/api/chat', async (req, res) => {
         
         contents.push({ role: 'user', parts: [{ text: message }] });
 
-        const response = await ai.models.generateContent({
-            model: 'gemini-3.5-flash-lite',
-            contents: contents,
-            config: {
-                systemInstruction: systemPrompt,
-                temperature: 0.3,
-            }
-        });
+        const reply = await (async function generateGeminiResponse() {
+            const modelsToTry = ['gemini-2.5-flash', 'gemini-3.5-flash-lite', 'gemini-2.0-flash'];
+            let lastError = null;
 
-        const reply = response.text;
+            for (const modelName of modelsToTry) {
+                for (let attempt = 1; attempt <= 2; attempt++) {
+                    try {
+                        const res = await ai.models.generateContent({
+                            model: modelName,
+                            contents: contents,
+                            config: {
+                                systemInstruction: systemPrompt,
+                                temperature: 0.3,
+                            }
+                        });
+                        if (res && res.text) return res.text;
+                    } catch (err) {
+                        lastError = err;
+                        console.warn(`[REINTENTO WEB] Modelo ${modelName} tuvo demanda alta (${err.status || 503}). Reintentando...`);
+                        await new Promise(r => setTimeout(r, 800));
+                    }
+                }
+            }
+            throw lastError;
+        })();
 
         // Save to history
         chatHistories[sessionId].push({ role: 'user', text: message });
