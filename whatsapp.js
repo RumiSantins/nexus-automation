@@ -246,9 +246,9 @@ client.on('message', async (msg) => {
             
             contents.push({ role: 'user', parts: [{ text: fullMessage }] });
 
-            // Función robusta para llamar a Gemini con reintentos y alternancia de modelos (evita errores 503 por alta demanda)
+            // Función robusta para llamar a Gemini con reintentos y alternancia de modelos (evita errores 503 y 429)
             const reply = await (async function generateGeminiResponse() {
-                const modelsToTry = ['gemini-2.5-flash', 'gemini-3.5-flash-lite', 'gemini-2.0-flash'];
+                const modelsToTry = ['gemini-1.5-flash', 'gemini-1.5-flash-8b', 'gemini-2.0-flash-lite', 'gemini-2.0-flash'];
                 let lastError = null;
 
                 for (const modelName of modelsToTry) {
@@ -265,8 +265,8 @@ client.on('message', async (msg) => {
                             if (res && res.text) return res.text;
                         } catch (err) {
                             lastError = err;
-                            console.warn(`[REINTENTO] Modelo ${modelName} tuvo demanda alta (${err.status || 503}). Reintentando...`);
-                            await new Promise(r => setTimeout(r, 800));
+                            console.warn(`[REINTENTO] Modelo ${modelName} (${err.status || 503}). Reintentando...`);
+                            await new Promise(r => setTimeout(r, 1500));
                         }
                     }
                 }

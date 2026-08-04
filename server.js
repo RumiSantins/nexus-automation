@@ -72,7 +72,7 @@ app.post('/api/chat', async (req, res) => {
         contents.push({ role: 'user', parts: [{ text: message }] });
 
         const reply = await (async function generateGeminiResponse() {
-            const modelsToTry = ['gemini-2.5-flash', 'gemini-3.5-flash-lite', 'gemini-2.0-flash'];
+            const modelsToTry = ['gemini-1.5-flash', 'gemini-1.5-flash-8b', 'gemini-2.0-flash-lite', 'gemini-2.0-flash'];
             let lastError = null;
 
             for (const modelName of modelsToTry) {
@@ -89,8 +89,8 @@ app.post('/api/chat', async (req, res) => {
                         if (res && res.text) return res.text;
                     } catch (err) {
                         lastError = err;
-                        console.warn(`[REINTENTO WEB] Modelo ${modelName} tuvo demanda alta (${err.status || 503}). Reintentando...`);
-                        await new Promise(r => setTimeout(r, 800));
+                        console.warn(`[REINTENTO WEB] Modelo ${modelName} (${err.status || 503}). Reintentando...`);
+                        await new Promise(r => setTimeout(r, 1500));
                     }
                 }
             }
