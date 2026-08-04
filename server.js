@@ -72,7 +72,7 @@ app.post('/api/chat', async (req, res) => {
         contents.push({ role: 'user', parts: [{ text: message }] });
 
         const reply = await (async function generateGeminiResponse() {
-            const modelsToTry = ['gemini-1.5-flash', 'gemini-1.5-flash-8b', 'gemini-2.0-flash-lite', 'gemini-2.0-flash'];
+            const modelsToTry = ['gemini-2.0-flash', 'gemini-2.0-flash-lite'];
             let lastError = null;
 
             for (const modelName of modelsToTry) {
@@ -89,8 +89,12 @@ app.post('/api/chat', async (req, res) => {
                         if (res && res.text) return res.text;
                     } catch (err) {
                         lastError = err;
+                        if (err.status === 429 || (err.message && err.message.includes('Quota exceeded'))) {
+                            console.warn(`[CUOTA EXCEDIDA WEB] La clave de API en .env excedió el límite gratuito en ${modelName}.`);
+                            break;
+                        }
                         console.warn(`[REINTENTO WEB] Modelo ${modelName} (${err.status || 503}). Reintentando...`);
-                        await new Promise(r => setTimeout(r, 1500));
+                        await new Promise(r => setTimeout(r, 1000));
                     }
                 }
             }
